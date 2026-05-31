@@ -379,6 +379,7 @@ def main():
         print(f"Error: File {args.log} does not exist", file=sys.stderr)
         sys.exit(1)
 
+    print(f"Parsing log: {args.log}...", file=sys.stderr)
     log_data = parse_log(args.log)
 
     if args.format == "json":
@@ -387,7 +388,12 @@ def main():
         output = to_csv(log_data)
 
     if args.out:
-        args.out.write_text(output, encoding='utf-8')
+        try:
+            args.out.write_text(output, encoding='utf-8')
+            print(f"Done! Results written to {args.out}", file=sys.stderr)
+        except Exception as e:
+            print(f"Error writing to file {args.out}: {e}", file=sys.stderr)
+            sys.exit(1)
     else:
         print(output)
 
