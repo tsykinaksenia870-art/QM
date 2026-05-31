@@ -145,37 +145,36 @@ def parse_results(lines: List[str], warnings: List[str]) -> Optional[Results]:
     ratio_re = re.compile(r"Activity ratio, exp\(-ddG/RT\):\s*(-?[\d.]+)")
     trans_re = re.compile(r"^\s*(?:\[.*?\]\s*)?(\w+)\s+to\s+(\w+)\s*$")
 
-    found_any = False
     for line in lines:
         content = re.sub(r"^\[.*?\]\s*", "", line)
 
         m = energy_opt_re.search(content)
         if m:
             energies[(m.group(1), int(m.group(2)), 'opt')] = float(m.group(3))
-            found_any = True; continue
+            continue
 
         m = energy_dot_re.search(content)
         if m:
             energies[(m.group(1), int(m.group(2)), 'dot')] = float(m.group(3))
-            found_any = True; continue
+            continue
 
         m = ddg_re.search(content)
         if m:
             ddG = float(m.group(1))
-            found_any = True; continue
+            continue
 
         m = ratio_re.search(content)
         if m:
             activity_ratio = float(m.group(1))
-            found_any = True; continue
+            continue
 
         m = trans_re.match(content)
         if m:
             trans_from = m.group(1)
             trans_to = m.group(2)
-            found_any = True; continue
+            continue
 
-    if not found_any:
+    if ddG is None and activity_ratio is None:
         return None
 
     try:
@@ -277,11 +276,35 @@ def parse_log(path: Path) -> BrsccpLog:
     lines = preprocess(raw)
     warnings = []
 
-    version, build_date, start_time = parse_header(lines, warnings)
-    input_params = parse_input_params(lines, warnings)
-    results = parse_results(lines, warnings)
-    diagnostics = parse_diagnostics(lines, warnings)
-    termination, total_runtime = parse_status(lines)
+    version, build_date, start_time = "UNKNOWN", "UNKNOWN", "UNKNOWN"
+    try:
+        version, build_date, start_time = parse_header(lines, warnings)
+    except Exception as e:
+        warnings.append(f"Error in parse_header: {e}")
+
+    input_params = {}
+    try:
+        input_params = parse_input_params(lines, warnings)
+    except Exception as e:
+        warnings.append(f"Error in parse_input_params: {e}")
+
+    results = None
+    try:
+        results = parse_results(lines, warnings)
+    except Exception as e:
+        warnings.append(f"Error in parse_results: {e}")
+
+    diagnostics = Diagnostics()
+    try:
+        diagnostics = parse_diagnostics(lines, warnings)
+    except Exception as e:
+        warnings.append(f"Error in parse_diagnostics: {e}")
+
+    termination, total_runtime = "UNKNOWN", None
+    try:
+        termination, total_runtime = parse_status(lines)
+    except Exception as e:
+        warnings.append(f"Error in parse_status: {e}")
 
     return BrsccpLog(
         version=version, build_date=build_date, start_time=start_time,
